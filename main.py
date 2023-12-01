@@ -34,56 +34,83 @@ subdivision: list[str] = ['СВК 501 Каменка',
                           'СВК-1',
                           'СВК-2',
                           'СВК-3']  # Временные подразделения
+names: list[str] = ['Ольга', 'Ирина', 'Елена']
 
 
 class TicketCreate(StatesGroup):
-    sub_div = State()
+    start = State()
+    subdiv_pick = State()
     full_name = State()
     category = State()
     description = State()
 
 
-@dp.message_handler(commands=['start'])
-async def start_message(message: types.Message):
+@dp.message_handler(commands=['start'], state=None)
+async def start_message(message: types.Message, state: FSMContext):
     # if (message.from_user.id) // only registered users can use the bot
+    current_state = await state.get_state()
+    print(f'Состояние в start_message: {current_state}')
     keyboard = InlineKeyboardMarkup()
     button = InlineKeyboardButton(text='Да', callback_data='start_yes')
     keyboard.add(button)
     await message.answer('Добрый день! Вы обратились в техподдержку.\nХотите оформить обращение или проверить статус?',
                          reply_markup=keyboard)
 
-
-@dp.callback_query_handler(text='start_yes')
-async def start_callback(callback: types.CallbackQuery):
-    await subdivision_show(callback)
+    await TicketCreate.next()
 
 
-async def subdivision_show(callback):
+@dp.callback_query_handler(text='start_yes', state=TicketCreate.start)
+async def start_callback(callback: types.CallbackQuery, state: FSMContext):
+    current_state = await state.get_state()
+    print(f'State in start_callback: {current_state}')
+
+    await subdivision_show(callback, state)
+    await callback.answer()
+    await TicketCreate.next()
+
+
+@dp.callback_query_handler(state=TicketCreate.start)
+async def subdivision_show(callback, state):
+    current_state = await state.get_state()
+    print(f'Состояние в subdivision_show {current_state}')
     keyboard = InlineKeyboardMarkup(row_width=3)
     for item in subdivision:
-        cd = f'button_{item.lower().replace(" ", "_")}'
+        cd = item
         btn = InlineKeyboardButton(text=item, callback_data=cd)
         keyboard.add(btn)
     await bot.send_message(callback.from_user.id, text='Укажите подразделение:', reply_markup=keyboard)
 
 
-# @dp.callback_query_handler(content_types=['sub_div'], state=TicketCreate.sub_div)
-# async def subdivision_pick(callback: types.CallbackQuery, state: FSMContext):
-#     btn_data = callback.data.split('_')
-#     _subdivision = ' '.join(btn_data[1:])
-#     async with state.proxy() as data:
-#         data['sub_div'] = callback.sub_div
-#
-#     await TicketCreate.sub_div.set()
-#     await callback.answer()
+@dp.callback_query_handler(state=TicketCreate.subdiv_pick)
+async def pick_sub_div(call: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['subdiv_pick'] = call.data
+
+    await bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
+    await bot.edit_message_text(f"Выбранное подразделение: {data['subdiv_pick']}",
+                                call.message.chat.id, call.message.message_id)
+    await TicketCreate.next()
+    await call.answer()
+
+    kb = InlineKeyboardMarkup()
+    for item in names:
+        btn = InlineKeyboardButton(text=item, callback_data=item)
+        kb.add(btn)
+
+    await bot.send_message(call.message.chat.id, "Выберите ваше имя:", reply_markup=kb)
 
 
-# @dp.message_handler()
-# async def select(message: types.Message, state: FSMContext):
-#     async with state.proxy() as data:
+@dp.callback_query_handler(state=TicketCreate.full_name)
+async def pick_name(call: types.CallbackQuery, state: FSMContext):
+    async with state.proxy() as data:
+        data['pick_name'] = call.data
+    await bot.edit_message_text(f'Выбранный сотрудник: {data["pick_name"]}',
+                                call.message.chat.id, call.message.message_id)
+    await TicketCreate.next()
+    await call.answer()
 
 
 if __name__ == '__main__':
     executor.start_polling(dispatcher=dp,
-                           skip_updates=True,
+                           skip_updates=False,
                            on_startup=on_start_up)
