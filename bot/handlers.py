@@ -24,11 +24,12 @@ names: list[str] = ['Ольга', 'Ирина', 'Елена']
 
 
 @dp.callback_query_handler(state=TicketCreate.confirmation)
-async def confirm_choice(call: types.CallbackQuery):
-    print("Я ПОПАЛ В ФУНКЦИЮ ПОДТВЕРЖДЕНИЯ confirm_choice")
-    print("Я ПОПАЛ В ФУНКЦИЮ ПОДТВЕРЖДЕНИЯ confirm_choice")
-    print("Я ПОПАЛ В ФУНКЦИЮ ПОДТВЕРЖДЕНИЯ confirm_choice1")
-    print("Я ПОПАЛ В ФУНКЦИЮ ПОДТВЕРЖДЕНИЯ confirm_choice2")
+async def confirm_choice(call: types.CallbackQuery, state: FSMContext):
+    if call.data == "division_confirm_yes":
+        current_state = state.get_state()
+        print(f'1 {current_state}')
+        await TicketCreate.next()
+        print(f'2 {current_state}')
 
 
 @dp.message_handler(commands=['start'], state=None)
@@ -50,22 +51,26 @@ async def start_callback(callback: types.CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     print(f'State in start_callback: {current_state}')
-    keyboard = await create_buttons(division)
-    await bot.send_message(callback.message.chat.id, "Укажите подразделение:",
-                           reply_markup=keyboard)
+    await show_division(callback, division)
     await callback.answer()
     await TicketCreate.next()
+
+
+async def show_division(call, div):
+    keyboard = await create_buttons(div)
+    await bot.send_message(call.message.chat.id, "Укажите подразделение:",
+                           reply_markup=keyboard)
 
 
 @dp.callback_query_handler(state=TicketCreate.division)
 async def division_pick(call: types.CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
     async with state.proxy() as data:
-        data['division'] = call.data
-    print(current_state)
+        data['p_division'] = call.data
+        data[f'{current_state.split(":")[1]}'] = current_state.split(':')[1]
     await state.set_state(TicketCreate.confirmation)
-    await confirm_pick(call.message.chat.id)
-    print(data['division'])
+    await confirm_pick(call.message.chat.id, call.message.message_id, data)
+    await call.answer()
 
 
 async def create_buttons(item_array):
@@ -77,52 +82,21 @@ async def create_buttons(item_array):
     return keyboard
 
 
-async def confirm_pick(chat_id):
-    print("Я ПОПАЛ В ФУНКЦИЮ ПОДТВЕРЖДЕНИЯ confirm_pick: " + f'{chat_id}')
-    keyboard = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(text="Да", callback_data="confirm_yes"),
-        InlineKeyboardButton(text="Нет", callback_data="confirm_no")
-    )
-
-    await bot.send_message(chat_id, "Подтвердить выбор", reply_markup=keyboard)
-
-# @dp.callback_query_handler(state=TicketCreate.start)
-# @dp.callback_query_handler(state=TicketCreate.starte)
-# async def subdivision_show(callback, state):
-#     current_state = await state.get_state()
-#     print(f'Состояние в subdivision_show {current_state}')
-#     keyboard = await create_buttons(subdivision)
-#     await bot.send_message(callback.from_user.id, text='Укажите подразделение:',
-#                            reply_markup=keyboard)
-# d
-#
-# @dp.callback_query_handler(state=TicketCreate.division)
-# async def division_pick(call: types.CallbackQuery, state: FSMContext):
-#
-#     async with state.proxy() as data:
-#         data['division'] = call.data
-#         print(data)
-#
-#     await state.set_state(TicketCreate.confirmation)
-#     await confirm_pick(call.message.chat.id)
-#     await bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
-#     await bot.edit_message_text(f"Выбранное подразделение: {data['division']}",
-#                                 call.message.chat.id, call.message.message_id)
-#
-#     await TicketCreate.next()
-#     await call.answer()
-#
-#     keyboard = await create_buttons(names)
-#     await confirm_pick(call.message.chat.id)
-#     await bot.send_message(call.message.chat.id, "Выберите ваше имя:",
-#                            reply_markup=keyboard)
+async def confirm_pick(chat_id, message_id, data):
+    btn1 = InlineKeyboardButton(text="Да", callback_data=f'confirm_yes')
+    btn2 = InlineKeyboardButton(text="Нет", callback_data=f'confirm_no')
+    kb = InlineKeyboardMarkup()
+    kb.add(btn1, btn2)
+    print(kb)
+    print("Я ПОПАЛ В ФУНКЦИЮ ПОДТВЕРЖДЕНИЯ confirm_pick: " + f'1')
+    await bot.send_message(chat_id, f'Вы уверены, что хотите выбрать {data["p_division"]} ?', reply_markup=kb)
+    # btn1 = InlineKeyboardButton(text="Да", callback_data=f'{data}_confirm_yes')
+    # btn2 = InlineKeyboardButton(text="Нет", callback_data=f'{data}_confirm_no')
+    # keyboard = InlineKeyboardMarkup()
+    # keyboard.add(btn1, btn2)
+    # print(chat_id)
+    # await bot.send_message(chat_id, f'Вы уверены что хотите подтвердить выбор - {data[data]} ?')
+    # await bot.delete_message(chat_id, message_id)
 
 
-# @dp.callback_query_handler(state=TicketCreate.full_name)
-# async def pick_name(call: types.CallbackQuery, state: FSMContext):
-#     async with state.proxy() as data:
-#         data['pick_name'] = call.data
-#     await bot.edit_message_text(f'Выбранный сотрудник: {data["pick_name"]}',
-#                                 call.message.chat.id, call.message.message_id)
-#     await TicketCreate.next()
-#     await call.answer()
+    # await bot.edit_message_reply_markup(chat_id, msg['from'].id, reply_markup=keyboard)
