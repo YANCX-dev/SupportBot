@@ -34,6 +34,7 @@ categories = [
     {"text": "Оборудование", "callback_data": "equipment"}
 ]
 
+# TODO: TicketCreate rename to StateMachine
 
 @dp.callback_query_handler(state=TicketCreate.confirmation)
 async def confirm_choice(call: types.CallbackQuery, state: FSMContext):
@@ -53,6 +54,8 @@ async def confirm_choice(call: types.CallbackQuery, state: FSMContext):
 
         elif call.data == "employee_confirm_yes":
             await state.set_state(TicketCreate.request_menu)
+            cs = await state.get_state()
+            print(f'STATE {cs}')
             await bot.edit_message_text(f'Сотрудник: <b>{data["p_employee"]}</b>', call.message.chat.id,
                                         call.message.message_id, parse_mode='HTML')
             await display_options(call, options)
@@ -75,7 +78,7 @@ async def create_buttons(item_array):
 async def create_keyboard(options_obj):
     keyboard_markup = InlineKeyboardMarkup(row_width=1)
 
-    for button_data in options:
+    for button_data in options_obj:
         keyboard_markup.add(
             InlineKeyboardButton(text=button_data["text"], callback_data=button_data["callback_data"])
         )
@@ -95,15 +98,19 @@ async def show_employee(call, employee_list):
                            reply_markup=keyboard)
 
 
+# @dp.callback_query_handler(state=TicketCreate.request_menu)
 async def show_categories(call, category_list):
-    bot.delete_message(call.message.chat.id, call.message.message_id)
-    keyboard = await create_keyboard(category_list)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    kb = await create_keyboard(category_list)
+    print(f'KB IN SHOW CATEGORIES: {kb}')
     await bot.send_message(call.message.chat.id, "Выберите категорию",
-                           reply_markup=keyboard)
+                           reply_markup=kb)
 
 
 async def display_options(call, option_btn_list):
+
     keyboard = await create_keyboard(option_btn_list)
+    print(f'KB IN DISPLAY_OPTIONS: {keyboard}')
     await bot.send_message(call.message.chat.id, "Выберите действие:",
                            reply_markup=keyboard)
 
@@ -118,7 +125,7 @@ async def confirm_pick(chat_id, message_id, data_state, data):
 
 
 @dp.message_handler(commands=['start'], state=None)
-async def start_message(message: types.Message, state: FSMContext):
+async def start_message(message: types.Message):
     # if (message.from_user.id) // only registered users can use the bot
     # current_state = await state.get_state()
     # print(f'Состояние в start_message: {current_state}')
@@ -165,8 +172,10 @@ async def employee_pick(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-@dp.callback_query_handler(state=TicketCreate.category)
+@dp.callback_query_handler(state=TicketCreate.request_menu)
 async def option_pick(call, state: FSMContext):
-    current_state = await state.get_state()
-    print(f'PICK THE CATEGORY: {current_state}')
-    await show_categories(call, categories)
+    if call.data == "create_req":
+        current_state = await state.get_state()
+        await show_categories(call, categories)
+    elif call.data == "check_status":
+        print("SOSAL PIZDU")
