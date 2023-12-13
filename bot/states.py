@@ -7,5 +7,7 @@ class StateMachine(StatesGroup):
     employee = State()
     request_menu = State()
     category = State()
+    service = State()
     description = State()
+    image = State()
     confirmation = State()
