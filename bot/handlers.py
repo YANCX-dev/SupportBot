@@ -127,7 +127,7 @@ async def confirm_choice(call: types.CallbackQuery, state: FSMContext):
 async def image_next(call: types.CallbackQuery, state: FSMContext):
     print(call.data)
     if call.data == "image_next":
-        await show_ticket_info(state, call.message.chat.id, call.message.message_id)
+        await show_ticket_info(state, call.message.chat.id)
         await create_new_ticket(call.message.chat.id, state)
         await call.answer()
 
@@ -318,23 +318,20 @@ async def get_description(message: types.Message, state: FSMContext):
     await confirm_descr(message.chat.id, state)
 
 
-async def show_ticket_info(state: FSMContext, chat_id, message_id):
-    # async with state.proxy() as data:
-
-    #TODO Удалить сообщение фотку, вывести инфо о заявке(новым сообщением)
-    await bot.delete_message(chat_id, message_id)
-        # await bot.edit_message_text(
-        #     f'Заявка:\n Подразделение: {data["p_division"]}\n Сотрудник: {data["p_employee"]}\n Категория: {data["p_category"]}\n Услуга: {data["p_service"]}\n Описание: {data["p_description"]}\n <b>Сформирована!</b>',
-        #     chat_id, message_id, parse_mode="HTML")
+async def show_ticket_info(state: FSMContext, chat_id):
+    async with state.proxy() as data:
+        await bot.send_message(chat_id=chat_id,
+                               text=f'Заявка:\n Подразделение: {data["p_division"]}\n Сотрудник: {data["p_employee"]}\n Категория: {data["p_category"]}\n Услуга: {data["p_service"]}\n Описание: {data["p_description"]}\n <b>Сформирована!</b>',
+                               parse_mode="HTML")
 
 
 # Обработчик для получения изображений
 @dp.message_handler(state=StateMachine.image, content_types=ContentType.PHOTO)
 async def get_image(message: types.Message, state: FSMContext):
-
+    await bot.delete_message(message.chat.id, message.message_id)
     st = await state.get_state()
     print(st)
-    await show_ticket_info(state, message.chat.id, message.message_id)
+    await show_ticket_info(state, message.chat.id)
     await create_new_ticket(message.chat.id, state)
 # Получение информации о картинке
 # photo = message.photo[-1]  # Берем последнюю (самую большую) версию изображения
